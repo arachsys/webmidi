@@ -123,14 +123,20 @@
     }
 
     document.addEventListener("DOMContentLoaded", async function() {
-      const print = shell(document.getElementById("shell"), send);
+      const log = document.getElementById("shell");
+      const print = shell(log, send);
       const error = message => print(message, "red");
       const transmit = await midi(chooser("rx"), chooser("tx"), receive);
 
       function send(line) {
         const words = line.split(/\s+/).filter(Boolean);
-        const bytes = words.map(x => Number("0x" + x));
+        if (words[0] == "clear") {
+          while (log.childNodes.length > 1)
+            log.removeChild(log.firstChild);
+          return;
+        }
 
+        const bytes = words.map(x => Number("0x" + x));
         if (bytes.some(x => isNaN(x) || x > 0xff))
           return error("Invalid byte sequence: " + line.trim());
         else if (bytes[0] & 0x80 == 0)
