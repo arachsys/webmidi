@@ -162,7 +162,11 @@
       }
 
       if (transmit == null)
-        error("Web MIDI not supported or port access refused");
+        return error("Web MIDI not supported or port access refused");
+      if (document.getElementById("rx").childNodes.length == 0)
+        error("Warning: no MIDI inputs found");
+      if (document.getElementById("tx").childNodes.length == 0)
+        error("Warning: no MIDI outputs found");
     });
   </script>
 
