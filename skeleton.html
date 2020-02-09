@@ -67,9 +67,6 @@
       };
     }
 
-    let error = console.error, log = console.log;
-    let main, receive, transmit;
-
     function hex(data) {
       return data.reduce(function(s, x) {
         return s + " " + x.toString(16).padStart(2, "0");
@@ -82,10 +79,34 @@
       return bytes.map(x => isNaN(x) || x > 0xff ? null : x);
     }
 
+    function receive(listener, timeout) {
+      return new Promise(function(resolve) {
+        function handler(event) {
+          const result = listener ? listener(event.data) : event.data;
+          if (result) {
+            clearTimeout(timer);
+            receivers.delete(handler);
+            resolve(result);
+          }
+        }
+
+        const timer = timeout && setTimeout(() => {
+          receivers.delete(handler);
+          resolve();
+        }, timeout);
+
+        receivers.add(handler);
+      });
+    }
+
+    const error = console.error, log = console.log;
+    const receivers = new Set();
+    let main, transmit;
+
     document.addEventListener("DOMContentLoaded", async function() {
       main = document.querySelector("main");
       transmit = await midi(chooser("rx"), chooser("tx"),
-                   event => receive && receive(event.data));
+                   event => receivers.forEach(handler => handler(event)));
 
       if (transmit == null)
         return error("Web MIDI not supported or port access refused");

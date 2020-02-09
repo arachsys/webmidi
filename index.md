@@ -41,11 +41,16 @@ skeleton code is extracted and generalised from the system exclusive tool
 above.
 
 Call `transmit` with an array of MIDI bytes to send that command to the
-selected output. Set `receive` to a function to be called with an array of
-MIDI bytes for each command arriving on the selected input.
+selected output. Call `receive` with a listener function and an optional
+timeout in milliseconds to subscribe to inbound messages as arrays of MIDI
+bytes. `receive` is asynchronous, returning a promise which resolves when
+the timeout expires or the listener returns true to signify completion.
+Alternatively, add a handler manually to `receivers` with `receivers.add` to
+subscribe to all message events, then remove it with `receivers.delete` when
+finished.
 
 Convenience functions `hex` and `raw` are provided to convert hex strings
-to/from raw byte arrays, as returned by `receive` and expected by
+to/from raw byte arrays, as passed to `receive` handlers and expected by
 `transmit`.
 
 
