@@ -29,6 +29,26 @@ time bytes. Note that if enabled, real time chatter from active sensing
 bytes and time clock messages can result in a very large log in the browser.
 
 
+## Skeleton page
+
+- <https://arachsys.github.io/webmidi/skeleton>
+- <https://github.com/arachsys/webmidi/blob/master/skeleton.html>
+
+Choose MIDI input and output ports from the drop-down selectors in the
+header bar. Useful functions and other constants are exported in global
+scope, accessible from the javascript console for easy hacking. This
+skeleton code is extracted and generalised from the system exclusive tool
+above.
+
+Call `transmit` with an array of MIDI bytes to send that command to the
+selected output. Set `receive` to a function to be called with an array of
+MIDI bytes for each command arriving on the selected input.
+
+Convenience functions `hex` and `raw` are provided to convert hex strings
+to/from raw byte arrays, as returned by `receive` and expected by
+`transmit`.
+
+
 ## Browser support
 
 Web MIDI has been [fully supported][1] by Google Chrome/Chromium/Blink since
