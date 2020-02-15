@@ -79,6 +79,15 @@
       return bytes.map(x => isNaN(x) || x > 0xff ? null : x);
     }
 
+    function match(pattern, data) {
+      if (pattern == null || data.length < pattern.length)
+        return false;
+      for (let index = 0; index < pattern.length; index++)
+        if (pattern[index] != null && pattern[index] != data[index])
+          return false;
+      return true;
+    }
+
     function receive(listener, timeout) {
       return new Promise(function(resolve) {
         function handler(event) {
@@ -97,6 +106,17 @@
 
         receivers.add(handler);
       });
+    }
+
+    async function dump(request, filter, finish, timeout) {
+      const messages = [];
+      const promise = receive(function(data) {
+        if (match(filter || [], data))
+          messages.push(data);
+        return match(finish, data);
+      }, timeout);
+      transmit(request);
+      return await promise, messages;
     }
 
     const error = console.error, log = console.log;

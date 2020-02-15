@@ -51,7 +51,31 @@ finished.
 
 Convenience functions `hex` and `raw` are provided to convert hex strings
 to/from raw byte arrays, as passed to `receive` handlers and expected by
-`transmit`.
+`transmit`. Invalid byte representations like '??' are translated by `raw`
+into null entries in the array, which is useful for constructing `match`
+patterns.
+
+`match(pattern, data)` returns true if the start of the message in `data`
+matches the pattern array `pattern`, where each element of `pattern` is
+either a literal byte to match, or null for a wildcard byte.
+
+A higher-level interface building on these facilities is also provided as
+async function `dump(request, filter, finish, timeout)`. This sends
+`request` then logs all responses matching `pattern` up to and including a
+terminator that matches `finish`, resolving to the list of received messages
+after either the terminator or `timeout` milliseconds have elapsed.
+
+For example,
+
+    request = raw("f0 43 20 7f 1c 02 0e 25 00 f7");
+    filter = raw("f0 43 00 7f 1c");
+    finish = raw("f0 43 00 7f 1c ?? ?? 02 0f 25 00");
+    response = await dump(request, filter, finish, 1000);
+
+will request a dump of the performance edit buffer from an attached Yamaha
+Montage, giving up after one second if the dump hasn't completed. Use
+`response.map(hex).join("\n")` to pretty-print a hex dump of the bulk data,
+and `response.forEach(transmit)` to restore the dump to the instrument.
 
 
 ## Browser support
