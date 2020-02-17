@@ -39,7 +39,7 @@
 
       access.inputs.forEach(port => rxchooser(port.id, port.name));
       access.outputs.forEach(port => txchooser(port.id, port.name));
-      return data => output && output.send(data);
+      return (data, time) => output && output.send(data, time);
     }
 
     function chooser(select) {
@@ -89,9 +89,12 @@
     }
 
     function receive(listener, timeout) {
+      if (listener == null)
+        listener = (data, time) => data;
+
       return new Promise(function(resolve) {
         function handler(event) {
-          const result = listener ? listener(event.data) : event.data;
+          const result = listener(event.data, event.receivedTime);
           if (result) {
             clearTimeout(timer);
             receivers.delete(handler);
