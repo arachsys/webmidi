@@ -29,7 +29,7 @@ time bytes. Note that if enabled, real time chatter from active sensing
 bytes and time clock messages can result in a very large log in the browser.
 
 
-## Skeleton page
+## MIDI skeleton page
 
 - <https://arachsys.github.io/webmidi/skeleton>
 - <https://github.com/arachsys/webmidi/blob/master/skeleton.html>
@@ -76,6 +76,48 @@ will request a dump of the performance edit buffer from an attached Yamaha
 Montage, giving up after one second if the dump hasn't completed. Use
 `response.map(hex).join("\n")` to pretty-print a hex dump of the bulk data,
 and `response.forEach(transmit)` to restore the dump to the instrument.
+
+
+## Montage skeleton page
+
+- <https://arachsys.github.io/webmidi/montage/skeleton>
+- <https://github.com/arachsys/webmidi/blob/master/montage/skeleton.html>
+
+A demonstration of automatic instrument detection, this page sends universal
+identity requests on each available output in turn, monitoring every input
+for a corresponding reply from a Yamaha Montage or MODX synthesizer. The
+object `montage` is exported in global scope, accessible from the javascript
+console.
+
+When an instrument is found, `montage.input` and `montage.output` are the
+connected input and output port, `montage.model` is the model detected (e.g.
+"Montage 8") and `montage.version` is the firmware version (e.g. "3.0"). The
+page header is updated to show the model and version detected.
+
+As above, call `montage.transmit` to send a command to the synthesizer, and
+call asynchronous function `montage.receive` with a listener and timeout to
+receive messages from it. The corresponding higher-level `montage.dump`
+interface also exists; for example:
+
+    request = raw("f0 43 20 7f 1c 02 0e 25 00 f7");
+    filter = raw("f0 43 00 7f 1c");
+    finish = raw("f0 43 00 7f 1c ?? ?? 02 0f 25 00");
+    response = await montage.dump(request, filter, finish, 1000);
+
+will request the performance edit buffer from a Montage. (A MODX would need
+group/model ID "7f 1c 07" rather than "7f 1c 02".)
+
+If no instrument is found, this is indicated in the header and the page
+continues to rescan once a second. In this case, `montage.transmit` and
+`montage.receive` do nothing, and all of `montage.input`, `montage.output`,
+`montage.model` and `montage.version` are set to null.
+
+The page will automatically initiate a rescan when the instrument's ports
+are disconnected. However, it does not continuously poll when the detected
+ports remain up. In practice, this means that unplugging a USB MIDI cable
+will be detected but unplugging a DIN MIDI cable will not. Click on the
+status message in the header to forget the existing instrument and force a
+rescan.
 
 
 ## Browser support

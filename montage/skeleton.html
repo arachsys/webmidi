@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="author" content="Chris Webb, chris@arachsys.com">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Montage Skeleton</title>
+
+  <script>
+    async function midi() {
+      try {
+        MIDIAccess.prototype.receive = function(listener, timeout) {
+          return new Promise(resolve => {
+            const inputs = this.inputs.values();
+            const timer = timeout && setTimeout(() => finish(), timeout);
+
+            const finish = result => {
+              clearTimeout(timer);
+              for (input of inputs)
+                input.removeEventListener("midimessage", message);
+              resolve(result);
+            };
+
+            const message = event => {
+              const result = listener ? listener(event) : event;
+              if (result)
+                finish(result);
+            };
+
+            for (input of inputs)
+              input.addEventListener("midimessage", message);
+          });
+        }
+
+        MIDIInput.prototype.receive = function(listener, timeout) {
+          return new Promise(resolve => {
+            const timer = timeout && setTimeout(() => finish(), timeout);
+
+            const finish = result => {
+              clearTimeout(timer);
+              this.removeEventListener("midimessage", message);
+              this.removeEventListener("statechange", connection);
+              resolve(result);
+            }
+
+            const message = event => {
+              const result = listener ? listener(event) : event;
+              if (result)
+                finish(result);
+            };
+
+            const connection = event => {
+              if (event.port.state != "connected")
+                finish()
+            };
+
+            this.addEventListener("midimessage", message);
+            this.addEventListener("statechange", connection);
+          });
+        };
+
+        return await navigator.requestMIDIAccess({sysex: true});
+      } catch {
+        return null;
+      }
+    }
+
+    function hex(data) {
+      return data.reduce(function(s, x) {
+        return s + " " + x.toString(16).padStart(2, "0");
+      }, "").slice(1);
+    }
+
+    function raw(line) {
+      const words = line.split(/\s+/).filter(Boolean);
+      const bytes = words.map(x => Number("0x" + x));
+      return bytes.map(x => isNaN(x) || x > 0xff ? null : x);
+    }
+
+    function match(pattern, data) {
+      if (pattern == null || data.length < pattern.length)
+        return false;
+      for (let index = 0; index < pattern.length; index++)
+        if (pattern[index] != null && pattern[index] != data[index])
+          return false;
+      return true;
+    }
+
+    const montage = {
+      clear() {
+        this.model = null;
+        this.version = null;
+        this.input = null;
+        this.output = null;
+      },
+
+      async dump(request, filter, finish, timeout) {
+        const messages = [];
+        const promise = this.receive(function(event) {
+          if (match(filter || [], event.data))
+            messages.push(event.data);
+          return match(finish, event.data);
+        }, timeout);
+        this.transmit(request);
+        return await promise, messages;
+      },
+
+      async find(access) {
+        const identify = raw("f0 7e 00 06 01 f7"), timeout = 100;
+        const signature = raw("f0 7e 7f 06 02 43 00 41 ?? 06 ??");
+        const model = message => ({
+          0x4e: "Montage 6", 0x4f: "Montage 7", 0x50: "Montage 8",
+          0x56: "MODX 6", 0x57: "MODX 7", 0x58: "MODX 8"
+        })[message[8]];
+        const version = message => (1.0 + 0.1 * message[10]).toFixed(1);
+
+        if (this.model)
+          if (this.input && this.input.state == "connected")
+            if (this.output && this.output.state == "connected")
+              return this.model;
+        this.clear();
+
+        for (const port of access.outputs.values()) {
+          const promise = access.receive(event => {
+            if (match(signature, event.data))
+              if (this.model = model(event.data), this.model) {
+                this.version = version(event.data);
+                this.input = event.target;
+                this.output = port;
+                return true;
+              }
+          }, timeout);
+          port.send(identify);
+          if (await promise)
+            break;
+        }
+        return this.model;
+      },
+
+      async receive(listener, timeout) {
+        if (this.input)
+          return await this.input.receive(listener, timeout);
+      },
+
+      transmit(data, time) {
+        if (this.output)
+          return this.output.send(data, time);
+      }
+    };
+
+    document.addEventListener("DOMContentLoaded", async function() {
+      const status = document.getElementById("status");
+      const access = await midi();
+      let interrupt = () => null;
+
+      if (access == null) {
+        status.style.color = "red";
+        status.textContent = "MIDI access refused";
+        return;
+      }
+
+      status.addEventListener("click", () => montage.clear(), interrupt());
+
+      while (true) {
+        if (montage.model == null) {
+          status.style.color = "grey";
+          status.textContent = "Scanning...";
+        }
+
+        if (await montage.find(access)) {
+          status.style.color = "green";
+          status.textContent = montage.model + " v" + montage.version;
+        }
+
+        await new Promise(resolve => setTimeout(interrupt = resolve, 1000));
+      }
+    });
+  </script>
+
+  <style>
+    html, body {
+      margin: 0;
+    }
+
+    header {
+      display: flex;
+      border-bottom: 1px solid #ddd;
+      padding: 4px;
+      font-family: system-ui, sans-serif;
+    }
+
+    header > * {
+      margin: 4px;
+      cursor: pointer;
+    }
+
+    header #title {
+      flex: 1;
+      color: inherit;
+      font-weight: bold;
+      text-decoration: inherit;
+    }
+
+    main {
+      padding: 8px;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <a href="https://arachsys.github.io/webmidi/" id="title">
+      Montage Skeleton
+    </a>
+    <span id="status"></span>
+  </header>
+  <main></main>
+</body>
+</html>
