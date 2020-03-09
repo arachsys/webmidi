@@ -111,9 +111,13 @@
       });
     }
 
-    async function dump(request, filter, finish, timeout) {
+    async function dump(request, start, filter, finish, timeout) {
       const messages = [];
       const promise = receive(function(data) {
+        if (start && match(start, data))
+          start = null;
+        else if (start)
+          return false;
         if (match(filter || [], data))
           messages.push(data);
         return match(finish, data);

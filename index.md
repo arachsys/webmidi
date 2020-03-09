@@ -60,17 +60,21 @@ matches the pattern array `pattern`, where each element of `pattern` is
 either a literal byte to match, or null for a wildcard byte.
 
 A higher-level interface building on these facilities is also provided as
-async function `dump(request, filter, finish, timeout)`. This sends
-`request` then logs all responses matching `pattern` up to and including a
-terminator that matches `finish`, resolving to the list of received messages
-after either the terminator or `timeout` milliseconds have elapsed.
+async function `dump(request, start, filter, finish, timeout)`. This sends
+`request`, waits for a response matching `start`, then logs all responses
+matching `pattern` up to and including a terminator that matches `finish`,
+resolving to the list of received messages after either the terminator or
+`timeout` milliseconds have elapsed. If `start` is null, logging of messages
+begins immediately. If `finish` is null, logging of messages continues until
+reception times out.
 
 For example,
 
     request = raw("f0 43 20 7f 1c 02 0e 25 00 f7");
-    filter = raw("f0 43 00 7f 1c");
+    start = raw("f0 43 00 7f 1c ?? ?? 02 0e 25 00");
+    filter = raw("f0 43 00 7f 1c ?? ?? 02");
     finish = raw("f0 43 00 7f 1c ?? ?? 02 0f 25 00");
-    response = await dump(request, filter, finish, 1000);
+    response = await dump(request, start, filter, finish, 1000);
 
 will request a dump of the performance edit buffer from an attached Yamaha
 Montage, giving up after one second if the dump hasn't completed. Use
@@ -100,9 +104,10 @@ receive messages from it. The corresponding higher-level `montage.dump`
 interface also exists; for example:
 
     request = raw("f0 43 20 7f 1c 02 0e 25 00 f7");
-    filter = raw("f0 43 00 7f 1c");
+    start = raw("f0 43 00 7f 1c ?? ?? 02 0e 25 00");
+    filter = raw("f0 43 00 7f 1c ?? ?? 02");
     finish = raw("f0 43 00 7f 1c ?? ?? 02 0f 25 00");
-    response = await montage.dump(request, filter, finish, 1000);
+    response = await montage.dump(request, start, filter, finish, 1000);
 
 will request the performance edit buffer from a Montage. (A MODX would need
 group/model ID "7f 1c 07" rather than "7f 1c 02".)

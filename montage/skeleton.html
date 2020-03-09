@@ -94,9 +94,13 @@
         this.output = null;
       },
 
-      async dump(request, filter, finish, timeout) {
+      async dump(request, start, filter, finish, timeout) {
         const messages = [];
         const promise = this.receive(function(event) {
+          if (start && match(start, event.data))
+            start = null;
+          else if (start)
+            return false;
           if (match(filter || [], event.data))
             messages.push(event.data);
           return match(finish, event.data);
