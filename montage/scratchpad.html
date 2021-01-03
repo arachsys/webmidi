@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="author" content="Chris Webb, chris@arachsys.com">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Montage Performance Scratchpad</title>
+
+  <script>
+    async function midi() {
+      try {
+        MIDIAccess.prototype.receive = function(listener, timeout) {
+          return new Promise(resolve => {
+            const inputs = this.inputs.values();
+            const timer = timeout && setTimeout(() => finish(), timeout);
+
+            const finish = result => {
+              clearTimeout(timer);
+              for (input of inputs)
+                input.removeEventListener("midimessage", message);
+              resolve(result);
+            };
+
+            const message = event => {
+              const result = listener ? listener(event) : event;
+              if (result)
+                finish(result);
+            };
+
+            for (input of inputs)
+              input.addEventListener("midimessage", message);
+          });
+        }
+
+        MIDIInput.prototype.receive = function(listener, timeout) {
+          return new Promise(resolve => {
+            const timer = timeout && setTimeout(() => finish(), timeout);
+
+            const finish = result => {
+              clearTimeout(timer);
+              this.removeEventListener("midimessage", message);
+              this.removeEventListener("statechange", connection);
+              resolve(result);
+            }
+
+            const message = event => {
+              const result = listener ? listener(event) : event;
+              if (result)
+                finish(result);
+            };
+
+            const connection = event => {
+              if (event.port.state != "connected")
+                finish()
+            };
+
+            this.addEventListener("midimessage", message);
+            this.addEventListener("statechange", connection);
+          });
+        };
+
+        return await navigator.requestMIDIAccess({sysex: true});
+      } catch {
+        return null;
+      }
+    }
+
+    function raw(line) {
+      const words = line.split(/\s+/).filter(Boolean);
+      const bytes = words.map(x => Number("0x" + x));
+      return bytes.map(x => isNaN(x) || x > 0xff ? null : x);
+    }
+
+    function match(pattern, data) {
+      if (pattern == null || data.length < pattern.length)
+        return false;
+      for (let index = 0; index < pattern.length; index++)
+        if (pattern[index] != null && pattern[index] != data[index])
+          return false;
+      return true;
+    }
+
+    const montage = {
+      clear() {
+        this.model = null;
+        this.version = null;
+        this.input = null;
+        this.output = null;
+      },
+
+      async dump(request, start, filter, finish, timeout) {
+        const messages = [];
+        const promise = this.receive(function(event) {
+          if (start && match(start, event.data))
+            start = null;
+          else if (start)
+            return false;
+          if (match(filter || [], event.data))
+            messages.push(event.data);
+          return match(finish, event.data);
+        }, timeout);
+        this.transmit(request);
+        return await promise, messages;
+      },
+
+      async find(access) {
+        const identify = raw("f0 7e 00 06 01 f7"), timeout = 100;
+        const signature = raw("f0 7e 7f 06 02 43 00 41 ?? 06 ??");
+        const model = message => ({
+          0x4e: "Montage 6", 0x4f: "Montage 7", 0x50: "Montage 8",
+          0x56: "MODX 6", 0x57: "MODX 7", 0x58: "MODX 8"
+        })[message[8]];
+        const version = message => (1.0 + 0.1 * message[10]).toFixed(1);
+
+        if (this.model)
+          if (this.input && this.input.state == "connected")
+            if (this.output && this.output.state == "connected")
+              return this.model;
+        this.clear();
+
+        for (const port of access.outputs.values()) {
+          const promise = access.receive(event => {
+            if (match(signature, event.data))
+              if (this.model = model(event.data), this.model) {
+                this.version = version(event.data);
+                this.input = event.target;
+                this.output = port;
+                return true;
+              }
+          }, timeout);
+          port.send(identify);
+          if (await promise)
+            break;
+        }
+        return this.model;
+      },
+
+      async receive(listener, timeout) {
+        if (this.input)
+          return await this.input.receive(listener, timeout);
+      },
+
+      transmit(data, time) {
+        if (this.output)
+          return this.output.send(data, time);
+      }
+    };
+
+    const performance = {
+      async get(timeout) {
+        if (montage.model && montage.model.startsWith("MODX")) {
+          const request = raw("f0 43 20 7f 1c 07 0e 25 00 f7");
+          const filter = raw("f0 43 00 7f 1c");
+          const start = raw("f0 43 00 7f 1c ?? ?? 07 0e 25 00");
+          const stop = raw("f0 43 00 7f 1c ?? ?? 07 0f 00 00");
+          return await montage.dump(request, start, filter, stop, timeout);
+        }
+
+        const request = raw("f0 43 20 7f 1c 02 0e 25 00 f7");
+        const filter = raw("f0 43 00 7f 1c");
+        const start = raw("f0 43 00 7f 1c ?? ?? 02 0e 25 00");
+        const stop = raw("f0 43 00 7f 1c ?? ?? 02 0f 00 00");
+        return await montage.dump(request, start, filter, stop, timeout);
+      },
+
+      name(messages) {
+        for (const message of messages)
+          if (match(raw("f0 43 00 7f 1c ?? ?? ?? 30 40 00"), message)) {
+            const name = message.slice(11, 31);
+            return new TextDecoder("ascii").decode(name).trim();
+          }
+      },
+
+      put(messages) {
+        messages.forEach(message => montage.transmit(message));
+      },
+
+      split(buffer) {
+        const messages = [], bytes = new Uint8Array(buffer);
+        for (let i = 0, j = 0; i < bytes.length; i = j) {
+          while (++j < bytes.length)
+            if (bytes[j] & 0x80)
+              if (bytes[i] != 0xf0 || bytes[j] != 0xf7)
+                break;
+          messages.push(bytes.slice(i, j));
+        }
+        return messages;
+      }
+    };
+
+    document.addEventListener("DOMContentLoaded", async function() {
+      const status = document.getElementById("status");
+      const access = await midi();
+      let interrupt = () => null;
+
+      if (access == null) {
+        status.style.color = "red";
+        status.textContent = "MIDI access refused";
+        return;
+      }
+
+      status.addEventListener("click", () => montage.clear(), interrupt());
+
+      while (true) {
+        if (montage.model == null) {
+          status.style.color = "grey";
+          status.textContent = "Scanning...";
+        }
+
+        if (await montage.find(access)) {
+          status.style.color = "green";
+          status.textContent = montage.model + " v" + montage.version;
+        }
+
+        await new Promise(resolve => setTimeout(interrupt = resolve, 1000));
+      }
+    });
+
+    document.addEventListener("DOMContentLoaded", function() {
+      const main = document.querySelector("main");
+      const template = document.querySelector("template").content;
+
+      function add(messages) {
+        const title = performance.name(messages);
+        if (title == null)
+          return;
+
+        const record = template.cloneNode(true);
+        record.querySelector("span.name").textContent = title;
+
+        const save = record.querySelector("a[title=Save]");
+        save.setAttribute("download", title + ".syx");
+        save.setAttribute("href", URL.createObjectURL(new Blob(messages, {
+          type: "application/octet-stream"
+        })));
+
+        const send = record.querySelector("a[title=Send]");
+        send.addEventListener("click", function (event) {
+          event.preventDefault();
+          event.target.classList.add("working");
+          setTimeout(() => event.target.classList.remove("working"), 1000);
+          messages.forEach(message => montage.transmit(message));
+        });
+
+        const remove = record.querySelector("a[title=Remove]");
+        remove.addEventListener("click", function (event) {
+          event.preventDefault();
+          main.removeChild(event.target.parentNode);
+          URL.revokeObjectURL(save.getAttribute("href"));
+        });
+
+        main.insertBefore(record, main.lastElementChild);
+        main.lastElementChild.scrollIntoView();
+      }
+
+      const receive = main.querySelector("a[title=Receive]");
+      receive.addEventListener("click", async function(event) {
+        event.preventDefault();
+        event.target.classList.add("working");
+        add(await performance.get(1000));
+        event.target.classList.remove("working");
+      });
+
+      const chooser = main.querySelector("input[type=file]");
+      chooser.addEventListener("change", async function(event) {
+        event.preventDefault();
+        for (const file of event.target.files)
+          add(performance.split(await file.arrayBuffer()));
+        event.target.value = null;
+      });
+
+      const load = main.querySelector("a[title=Load]");
+      load.addEventListener("click", function(event) {
+        event.preventDefault();
+        chooser.click();
+      });
+
+      document.addEventListener("dragover", event => event.preventDefault());
+      document.addEventListener("drop", async function(event) {
+        event.preventDefault();
+        for (const file of event.dataTransfer.files)
+          add(performance.split(await file.arrayBuffer()));
+      });
+    });
+  </script>
+
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      font-family: system-ui, sans-serif;
+      overflow-y: hidden;
+    }
+
+    header {
+      display: flex;
+      border-bottom: 1px solid #ddd;
+      padding: 4px;
+    }
+
+    header > * {
+      margin: 4px;
+      cursor: pointer;
+    }
+
+    header #title {
+      flex: 1;
+      color: inherit;
+      font-weight: bold;
+      text-decoration: inherit;
+    }
+
+    main {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 8px;
+    }
+
+    main a {
+      color: inherit;
+      text-decoration: inherit;
+    }
+
+    main a:hover {
+      outline: 3px solid #7af;
+    }
+
+    main a.working {
+      font-weight: bold;
+      outline: 3px solid transparent;
+    }
+
+    main input[type=file]  {
+      display: none;
+    }
+
+    main span.name {
+      margin-left: 1em;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <a href="https://arachsys.github.io/webmidi/" id="title">
+      Montage Performance Scratchpad
+    </a>
+    <span id="status"></span>
+  </header>
+  <main>
+    <p>
+      <a href="#" title="Receive">&rightarrow;</a>
+      <a href="#" title="Load">&uparrow;</a>
+      <input type="file" accept=".syx" multiple>
+    </p>
+  </main>
+  <template>
+    <p>
+      <a href="#" title="Send">&leftarrow;</a>
+      <a href="#" title="Save">&downarrow;</a>
+      <a href="#" title="Remove">&cross;</a>
+      <span class="name"></span>
+    </p>
+  </template>
+</body>
+</html>

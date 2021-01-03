@@ -29,6 +29,29 @@ time bytes. Note that if enabled, real time chatter from active sensing
 bytes and time clock messages can result in a very large log in the browser.
 
 
+## Montage performance scratchpad
+
+- <https://arachsys.github.io/webmidi/montage/scratchpad>
+- <https://github.com/arachsys/webmidi/blob/master/montage/scratchpad.html>
+
+This tool is a simple instrument-specific patch librarian, demonstrating
+automatic instrument detection and system exclusive dump/restore. It scans
+for an attached Yamaha Montage or MODX synthesizer by sending universal
+identity requests on all available outputs and monitoring for known replies.
+When a suitable instrument is connected, the model and version are indicated
+in the header bar.
+
+Use the rightward arrow to fetch the current performance from the
+instrument's edit buffer. Alternatively, use the upward arrow to load a
+performance from a file in raw sysex dump format, or just drag the file onto
+the page.
+
+For each received or loaded performance, a scratchpad row will be inserted
+with its name, a leftward arrow to return it to the instrument's edit
+buffer, a downward arrow to save it to a file, and an X to delete the row
+from the scratchpad.
+
+
 ## MIDI skeleton page
 
 - <https://arachsys.github.io/webmidi/skeleton>
@@ -87,11 +110,11 @@ and `response.forEach(transmit)` to restore the dump to the instrument.
 - <https://arachsys.github.io/webmidi/montage/skeleton>
 - <https://github.com/arachsys/webmidi/blob/master/montage/skeleton.html>
 
-A demonstration of automatic instrument detection, this page sends universal
-identity requests on each available output in turn, monitoring every input
-for a corresponding reply from a Yamaha Montage or MODX synthesizer. The
-object `montage` is exported in global scope, accessible from the javascript
-console.
+A minimal demonstration of automatic instrument detection, this page sends
+universal identity requests on each available output in turn, monitoring
+every input for a corresponding reply from a Yamaha Montage or MODX
+synthesizer. The object `montage` is exported in global scope, accessible
+from the javascript console.
 
 When an instrument is found, `montage.input` and `montage.output` are the
 connected input and output port, `montage.model` is the model detected (e.g.
