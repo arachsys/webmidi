@@ -166,8 +166,9 @@
       name(messages) {
         for (const message of messages)
           if (match(raw("f0 43 00 7f 1c ?? ?? ?? 30 40 00"), message)) {
-            const name = message.slice(11, 31);
-            return new TextDecoder("ascii").decode(name).trim();
+            const ascii =  new TextDecoder("ascii");
+            const name = ascii.decode(message.slice(11, 31));
+            return name.replace(/\s*(|\0.*)$/, "");
           }
       },
 
