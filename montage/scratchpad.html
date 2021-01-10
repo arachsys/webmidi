@@ -281,6 +281,20 @@
         for (const file of event.dataTransfer.files)
           add(performance.split(await file.arrayBuffer()));
       });
+
+      document.addEventListener("keydown", function(event) {
+        if (/^[=>]$/.test(event.key)) {
+          event.preventDefault();
+          return receive.click();
+        } else if (/^[1-9]$/.test(event.key)) {
+          const rows = main.children;
+          const entry = rows[rows.length - Number(event.key) - 1];
+          if (entry) {
+            event.preventDefault();
+            return entry.querySelector("a[title=Send]").click();
+          }
+        }
+      });
     });
   </script>
 

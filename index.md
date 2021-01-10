@@ -51,6 +51,12 @@ with its name, a leftward arrow to return it to the instrument's edit
 buffer, a downward arrow to save it to a file, and an X to delete the row
 from the scratchpad.
 
+For convenience, some simple keyboard shortcuts are defined. The `=` or `>`
+key fetches the current performance from the instrument, equivalent to
+clicking on the rightward arrow. The digits `1` to `9` send one of the last
+nine rows back to the instrument, equivalent to clicking on the left arrow
+for that entry, with `1` corresponding to the most recent performance.
+
 
 ## MIDI skeleton page
 
