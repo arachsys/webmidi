@@ -159,15 +159,18 @@ rescan.
 Web MIDI has been [fully supported][1] by Google Chrome/Chromium/Blink since
 version 43 in May 2015, running on Android, Chrome OS, Linux, macOS and
 Windows. It also works on derivative browsers such as recent Microsoft Edge,
-Brave and Opera.
+Brave and Opera. Hot-plugging interfaces works correctly on all platforms.
 
-Mozilla Firefox/Gecko does not support Web MIDI as of February 2020. A
-[third-party extension][2] is available, enabling the API using the [Jazz
-plugin][3]. Work towards native Web MIDI in Firefox is slowly progressing,
-despite an [alarming RFP discussion][4] complete with hysterical claims that
-hardware MIDI users are incapable of informed consent to sysex access.
+Despite an [alarming RFP discussion][2] complete with hysterical claims that
+hardware MIDI users are incapable of informed consent to sysex access,
+Mozilla Firefox/Gecko introduced Web MIDI support on Linux, macOS and
+Windows in the 99.0a1 nightly builds. Flip `dom.webmidi.enabled` to true in
+`about:config` to enable it. Web MIDI is not available in the 97.0 release
+nor the 98.0b2 beta, but might be in the final 98.0 release. Hot-plugging
+interfaces after the browser is launched does not yet work correctly on
+every platform.
 
-Apple Safari/WebKit also has no support as of February 2020. Unfortunately,
+Apple Safari/WebKit still has no support as of February 2022. Unfortunately,
 WebKit lags behind other browser engines in implementing far more mainstream
 web standards, suggesting the outlook for Web MIDI is bleak. Worse, all
 alternative browsers on iOS must use the system-provided WebKit; Apple abuse
@@ -177,14 +180,14 @@ better-maintained browser engines.
 Plugins and extensions are not supported on iOS, so unless Mobile Safari
 itself switches to Blink as rumoured, Web MIDI is likely to remain locked
 out from Apple iDevices for the foreseeable future. The macOS build of
-Safari is less restricted: in theory the [Jazz plugin][3] and [extension][2]
-could be employed there as with Firefox, but other current WebKit
-deficiencies are likely to break these Web MIDI tools too.
+Safari is less restricted: in theory the [Jazz plugin][3] and [extension][4]
+could be employed there, but other WebKit deficiencies are likely to break
+these Web MIDI tools too.
 
 [1]: https://www.chromestatus.com/feature/4923613069180928
-[2]: https://jazz-soft.net/download/web-midi/
+[2]: https://github.com/mozilla/standards-positions/issues/58
 [3]: https://jazz-soft.net/download/Jazz-Plugin/
-[4]: https://github.com/mozilla/standards-positions/issues/58
+[4]: https://jazz-soft.net/download/web-midi/
 
 
 ## Copying
