@@ -164,11 +164,13 @@ Brave and Opera. Hot-plugging interfaces works correctly on all platforms.
 Despite an [alarming RFP discussion][2] complete with hysterical claims that
 hardware MIDI users are incapable of informed consent to sysex access,
 Mozilla Firefox/Gecko introduced Web MIDI support on Linux, macOS and
-Windows in the 99.0a1 nightly builds. Flip `dom.webmidi.enabled` to true in
-`about:config` to enable it. Web MIDI is not available in the 97.0 release
-nor the 98.0b2 beta, but might be in the final 98.0 release. Hot-plugging
-interfaces after the browser is launched does not yet work correctly on
-every platform.
+Windows in version 98.0, albeit well-hidden. Turn on `dom.webmidi.enabled`
+in `about:config` then restart the browser to enable MIDI. You then need to
+manually add *Access MIDI devices* and *Access MIDI devices with SysEx
+support* permissions for the page in *Tools* -> *Page Info* before
+reloading, as otherwise it silently fails instead of confirming.
+Hot-plugging interfaces after the browser is launched does not yet work
+correctly on every platform.
 
 Apple Safari/WebKit still has no support as of February 2022. Unfortunately,
 WebKit lags behind other browser engines in implementing far more mainstream
