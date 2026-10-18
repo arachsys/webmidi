@@ -1,190 +1,184 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="author" content="Chris Webb, chris@arachsys.com">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MIDI Skeleton</title>
+<!doctype html>
+<title>MIDI Skeleton</title>
+<meta name="author" content="Chris Webb, chris@arachsys.com">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <script>
-    async function midi(rxchooser, txchooser, receive) {
-      let access, input, output;
+<script>
+async function midi(rxchooser, txchooser, receive) {
+  let access, input, output;
 
-      try {
-        access = await navigator.requestMIDIAccess({sysex: true});
-      } catch {
-        return null;
-      }
+  try {
+    access = await navigator.requestMIDIAccess({sysex: true});
+  } catch {
+    return null;
+  }
 
-      rxchooser = rxchooser(function(id) {
-        if (input && input.id != id && receive)
-          input.removeEventListener("midimessage", receive);
-        input = access.inputs.get(id);
-        if (input && receive)
-          input.addEventListener("midimessage", receive);
-      });
+  rxchooser = rxchooser(function(id) {
+    if (input && input.id != id && receive)
+      input.removeEventListener("midimessage", receive);
+    input = access.inputs.get(id);
+    if (input && receive)
+      input.addEventListener("midimessage", receive);
+  });
 
-      txchooser = txchooser(function(id) {
-        output = access.outputs.get(id);
-      });
+  txchooser = txchooser(function(id) {
+    output = access.outputs.get(id);
+  });
 
-      access.addEventListener("statechange", function(event) {
-        const id = event.port.id, state = event.port.state;
-        const name = state == "connected" ? event.port.name : null;
-        if (event.port.type == "input")
-          rxchooser(id, name);
-        else if (event.port.type == "output")
-          txchooser(id, name);
-      });
+  access.addEventListener("statechange", function(event) {
+    const id = event.port.id, state = event.port.state;
+    const name = state == "connected" ? event.port.name : null;
+    if (event.port.type == "input")
+      rxchooser(id, name);
+    else if (event.port.type == "output")
+      txchooser(id, name);
+  });
 
-      access.inputs.forEach(port => rxchooser(port.id, port.name));
-      access.outputs.forEach(port => txchooser(port.id, port.name));
-      return (data, time) => output && output.send(data, time);
-    }
+  access.inputs.forEach(port => rxchooser(port.id, port.name));
+  access.outputs.forEach(port => txchooser(port.id, port.name));
+  return (data, time) => output && output.send(data, time);
+}
 
-    function chooser(select) {
-      select = document.getElementById(select);
-      return function(choose) {
-        select.onchange = event => choose(select.value);
-        return function(id, name) {
-          for (let option = 0; option < select.length; option++)
-            if (select.options[option].value == id) {
-              if (name) {
-                if (select.options[option].text != name)
-                  select.options[option].text = name;
-                return;
-              }
-              select.options[option].remove(option);
-            }
+function chooser(select) {
+  select = document.getElementById(select);
+  return function(choose) {
+    select.onchange = event => choose(select.value);
+    return function(id, name) {
+      for (let option = 0; option < select.length; option++)
+        if (select.options[option].value == id) {
           if (name) {
-            const option = document.createElement("option");
-            option.value = id;
-            option.text = name;
-            select.add(option);
+            if (select.options[option].text != name)
+              select.options[option].text = name;
+            return;
           }
-          choose(select.value);
-        };
-      };
-    }
-
-    function hex(data) {
-      return data.reduce(function(s, x) {
-        return s + " " + x.toString(16).padStart(2, "0");
-      }, "").slice(1);
-    }
-
-    function raw(line) {
-      const words = line.split(/\s+/).filter(Boolean);
-      const bytes = words.map(x => Number("0x" + x));
-      return bytes.map(x => isNaN(x) || x > 0xff ? null : x);
-    }
-
-    function match(pattern, data) {
-      if (pattern == null || data.length < pattern.length)
-        return false;
-      for (let index = 0; index < pattern.length; index++)
-        if (pattern[index] != null && pattern[index] != data[index])
-          return false;
-      return true;
-    }
-
-    function receive(listener, timeout) {
-      if (listener == null)
-        listener = (data, time) => data;
-
-      return new Promise(function(resolve) {
-        function handler(event) {
-          const result = listener(event.data, event.receivedTime);
-          if (result) {
-            clearTimeout(timer);
-            receivers.delete(handler);
-            resolve(result);
-          }
+          select.options[option].remove(option);
         }
+      if (name) {
+        const option = document.createElement("option");
+        option.value = id;
+        option.text = name;
+        select.add(option);
+      }
+      choose(select.value);
+    };
+  };
+}
 
-        const timer = timeout && setTimeout(() => {
-          receivers.delete(handler);
-          resolve();
-        }, timeout);
+function hex(data) {
+  return data.reduce(function(s, x) {
+    return s + " " + x.toString(16).padStart(2, "0");
+  }, "").slice(1);
+}
 
-        receivers.add(handler);
-      });
+function raw(line) {
+  const words = line.split(/\s+/).filter(Boolean);
+  const bytes = words.map(x => Number("0x" + x));
+  return bytes.map(x => isNaN(x) || x > 0xff ? null : x);
+}
+
+function match(pattern, data) {
+  if (pattern == null || data.length < pattern.length)
+    return false;
+  for (let index = 0; index < pattern.length; index++)
+    if (pattern[index] != null && pattern[index] != data[index])
+      return false;
+  return true;
+}
+
+function receive(listener, timeout) {
+  if (listener == null)
+    listener = (data, time) => data;
+
+  return new Promise(function(resolve) {
+    function handler(event) {
+      const result = listener(event.data, event.receivedTime);
+      if (result) {
+        clearTimeout(timer);
+        receivers.delete(handler);
+        resolve(result);
+      }
     }
 
-    async function dump(request, start, filter, finish, timeout) {
-      const messages = [];
-      const promise = receive(function(data) {
-        if (start && match(start, data))
-          start = null;
-        else if (start)
-          return false;
-        if (match(filter || [], data))
-          messages.push(data);
-        return match(finish, data);
-      }, timeout);
-      transmit(request);
-      return await promise, messages;
-    }
+    const timer = timeout && setTimeout(() => {
+      receivers.delete(handler);
+      resolve();
+    }, timeout);
 
-    const error = console.error, log = console.log;
-    const receivers = new Set();
-    let main, transmit;
+    receivers.add(handler);
+  });
+}
 
-    document.addEventListener("DOMContentLoaded", async function() {
-      main = document.querySelector("main");
-      transmit = await midi(chooser("rx"), chooser("tx"),
-                   event => receivers.forEach(handler => handler(event)));
+async function dump(request, start, filter, finish, timeout) {
+  const messages = [];
+  const promise = receive(function(data) {
+    if (start && match(start, data))
+      start = null;
+    else if (start)
+      return false;
+    if (match(filter || [], data))
+      messages.push(data);
+    return match(finish, data);
+  }, timeout);
+  transmit(request);
+  return await promise, messages;
+}
 
-      if (transmit == null)
-        return error("Web MIDI not supported or port access refused");
-      if (document.getElementById("rx").childNodes.length == 0)
-        error("Warning: no MIDI inputs found");
-      if (document.getElementById("tx").childNodes.length == 0)
-        error("Warning: no MIDI outputs found");
-    });
-  </script>
+const error = console.error, log = console.log;
+const receivers = new Set();
+let main, transmit;
 
-  <style>
-    html, body {
-      margin: 0;
-    }
+document.addEventListener("DOMContentLoaded", async function() {
+  main = document.querySelector("main");
+  transmit = await midi(chooser("rx"), chooser("tx"),
+               event => receivers.forEach(handler => handler(event)));
 
-    header {
-      display: flex;
-      border-bottom: 1px solid #ddd;
-      padding: 4px;
-      font-family: system-ui, sans-serif;
-    }
+  if (transmit == null)
+    return error("Web MIDI not supported or port access refused");
+  if (document.getElementById("rx").childNodes.length == 0)
+    error("Warning: no MIDI inputs found");
+  if (document.getElementById("tx").childNodes.length == 0)
+    error("Warning: no MIDI outputs found");
+});
+</script>
 
-    header > * {
-      margin: 4px;
-    }
+<style>
+html, body {
+  margin: 0;
+}
 
-    header #title {
-      flex: 1;
-      color: inherit;
-      font-weight: bold;
-      text-decoration: inherit;
-    }
+header {
+  display: flex;
+  border-bottom: 1px solid #ddd;
+  padding: 4px;
+  font-family: system-ui, sans-serif;
+}
 
-    header select:empty {
-      visibility: hidden;
-    }
+header > * {
+  margin: 4px;
+}
 
-    main {
-      padding: 8px;
-    }
-  </style>
-</head>
+header #title {
+  flex: 1;
+  color: inherit;
+  font-weight: bold;
+  text-decoration: inherit;
+}
 
-<body>
-  <header>
-    <a href="https://arachsys.github.io/webmidi/" id="title">
-      MIDI Skeleton
-    </a>
-    <select id="rx" title="MIDI Receive Port"></select>
-    <select id="tx" title="MIDI Transmit Port"></select>
-  </header>
-  <main></main>
-</body>
-</html>
+header select:empty {
+  visibility: hidden;
+}
+
+main {
+  padding: 8px;
+}
+</style>
+
+<header>
+  <a href="https://arachsys.github.io/webmidi/" id="title">
+    MIDI Skeleton
+  </a>
+  <select id="rx" title="MIDI Receive Port"></select>
+  <select id="tx" title="MIDI Transmit Port"></select>
+</header>
+
+<main></main>
